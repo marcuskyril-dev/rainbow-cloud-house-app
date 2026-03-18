@@ -1,0 +1,24 @@
+{
+  "name": "wishlist-lambdas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/lib-dynamodb": "^3.0.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.0.0",
+    "@aws-sdk/client-s3": "^3.0.0",
+    "@aws-sdk/s3-request-presigner": "^3.0.0",
+    "uuid": "^11.0.0",
+    "zod": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.0.0",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.0.0"
+  }
+}

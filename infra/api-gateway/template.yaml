@@ -1,0 +1,296 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Rainbow Cloud House Wishlist — API Gateway + Lambda + DynamoDB + S3 + Cognito
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        WISHLIST_TABLE: !Ref WishlistTable
+        IDEMPOTENCY_TABLE: !Ref IdempotencyTable
+        IMAGES_BUCKET: !Ref ImagesBucket
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+  CorsOrigin:
+    Type: String
+    Default: "*"
+
+Resources:
+  # ─── API Gateway ─────────────────────────────────────────────
+
+  WishlistApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub wishlist-api-${Stage}
+      StageName: !Ref Stage
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization,X-Request-Id,X-Amz-Date,X-Api-Key'"
+        AllowOrigin: !Sub "'${CorsOrigin}'"
+      Auth:
+        DefaultAuthorizer: NONE
+        Authorizers:
+          CognitoAuth:
+            UserPoolArn: !GetAtt CognitoUserPool.Arn
+
+  # ─── Lambda Functions ───────────────────────────────────────
+
+  GetItemsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub wishlist-getItems-${Stage}
+      Handler: dist/handlers/getItems.handler
+      CodeUri: ../lambda/
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref WishlistTable
+      Events:
+        GetItems:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WishlistApi
+            Path: /items
+            Method: GET
+
+  CreateItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub wishlist-createItem-${Stage}
+      Handler: dist/handlers/createItem.handler
+      CodeUri: ../lambda/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref WishlistTable
+      Events:
+        CreateItem:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WishlistApi
+            Path: /items
+            Method: POST
+            Auth:
+              Authorizer: CognitoAuth
+
+  UpdateItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub wishlist-updateItem-${Stage}
+      Handler: dist/handlers/updateItem.handler
+      CodeUri: ../lambda/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref WishlistTable
+      Events:
+        UpdateItem:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WishlistApi
+            Path: /items/{id}
+            Method: PUT
+            Auth:
+              Authorizer: CognitoAuth
+
+  DeleteItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub wishlist-deleteItem-${Stage}
+      Handler: dist/handlers/deleteItem.handler
+      CodeUri: ../lambda/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref WishlistTable
+      Events:
+        DeleteItem:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WishlistApi
+            Path: /items/{id}
+            Method: DELETE
+            Auth:
+              Authorizer: CognitoAuth
+
+  ContributeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub wishlist-contribute-${Stage}
+      Handler: dist/handlers/contribute.handler
+      CodeUri: ../lambda/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref WishlistTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref IdempotencyTable
+      Events:
+        Contribute:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WishlistApi
+            Path: /contribute
+            Method: POST
+
+  # ─── DynamoDB Tables ─────────────────────────────────────────
+
+  WishlistTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub WishlistApp-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  IdempotencyTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub IdempotencyKeys-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+      TimeToLiveSpecification:
+        Enabled: true
+        AttributeName: ttl
+
+  # ─── S3 Bucket ───────────────────────────────────────────────
+
+  ImagesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub wishlist-images-${Stage}-${AWS::AccountId}
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: [GET, PUT]
+            AllowedOrigins: ["*"]
+            MaxAge: 3600
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # ─── Cognito ─────────────────────────────────────────────────
+
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub wishlist-users-${Stage}
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+          RequireUppercase: true
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub wishlist-web-${Stage}
+      UserPoolId: !Ref CognitoUserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      SupportedIdentityProviders:
+        - COGNITO
+      AllowedOAuthFlows:
+        - implicit
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+
+  # ─── IAM Role (shared base) ─────────────────────────────────
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub wishlist-lambda-role-${Stage}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  - !GetAtt WishlistTable.Arn
+                  - !Sub "${WishlistTable.Arn}/index/*"
+                  - !GetAtt IdempotencyTable.Arn
+        - PolicyName: S3ImageAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub "${ImagesBucket.Arn}/*"
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${WishlistApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref CognitoUserPool
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref CognitoUserPoolClient
+  ImagesBucketName:
+    Description: S3 bucket for images
+    Value: !Ref ImagesBucket
+  WishlistTableName:
+    Description: DynamoDB main table name
+    Value: !Ref WishlistTable

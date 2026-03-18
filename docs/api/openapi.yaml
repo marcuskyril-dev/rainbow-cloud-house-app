@@ -1,0 +1,622 @@
+openapi: 3.0.3
+info:
+  title: Rainbow Cloud House Wishlist API
+  description: REST API for the housewarming wishlist web app MVP
+  version: 1.0.0
+
+servers:
+  - url: /api
+    description: API base path
+
+tags:
+  - name: Items
+    description: Wishlist item management
+  - name: Contribute
+    description: Contribution to items
+  - name: Uploads
+    description: File upload presigning
+
+paths:
+  /items:
+    get:
+      tags: [Items]
+      summary: List wishlist items
+      description: Public endpoint to list wishlist items with optional filtering and pagination
+      operationId: listItems
+      security: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [available, partially_funded, funded, archived]
+          description: Filter by item status
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+          description: Maximum number of items to return
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Pagination token from previous response
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListItemsResponse'
+    post:
+      tags: [Items]
+      summary: Create wishlist item
+      description: Admin-only. Create a new wishlist item.
+      operationId: createItem
+      security:
+        - CognitoAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateItemRequest'
+      responses:
+        '201':
+          description: Item created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /items/{id}:
+    put:
+      tags: [Items]
+      summary: Update wishlist item
+      description: Admin-only. Update an existing wishlist item. Requires expectedVersion for optimistic locking.
+      operationId: updateItem
+      security:
+        - CognitoAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateItemRequest'
+      responses:
+        '200':
+          description: Item updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ItemNotFound'
+        '409':
+          description: Version conflict (optimistic lock failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: VERSION_CONFLICT
+                  message: Item was modified by another request. Please refresh and try again.
+    delete:
+      tags: [Items]
+      summary: Delete wishlist item
+      description: Admin-only. Delete a wishlist item. If the item has contributions, it will be archived instead of hard-deleted.
+      operationId: deleteItem
+      security:
+        - CognitoAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Item deleted (or archived if it had contributions)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ItemNotFound'
+
+  /items/{id}/metadata-fetch:
+    post:
+      tags: [Items]
+      summary: Fetch product metadata from URL
+      description: Admin-only. Fetch OpenGraph metadata from a product URL.
+      operationId: fetchItemMetadata
+      security:
+        - CognitoAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetadataFetchRequest'
+      responses:
+        '200':
+          description: Metadata fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataFetchResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: URL unreachable or no OpenGraph metadata found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                urlUnreachable:
+                  summary: URL_UNREACHABLE
+                  value:
+                    error:
+                      code: URL_UNREACHABLE
+                      message: The provided URL could not be reached.
+                ogNotFound:
+                  summary: OG_NOT_FOUND
+                  value:
+                    error:
+                      code: OG_NOT_FOUND
+                      message: No OpenGraph metadata found at the provided URL.
+
+  /items/{id}/contributions:
+    get:
+      tags: [Contribute]
+      summary: List item contributions
+      description: Public endpoint. Fetch contribution history for a single item.
+      operationId: listItemContributions
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Contributions fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contributions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Contribution'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /contribute:
+    post:
+      tags: [Contribute]
+      summary: Contribute to an item
+      description: Public endpoint. Contribute money toward a wishlist item. Requires requestId for idempotency.
+      operationId: contributeItem
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContributeRequest'
+      responses:
+        '201':
+          description: Contribution created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContributeResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/ItemNotFound'
+        '409':
+          description: Contribution conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                overpayment:
+                  summary: OVERPAYMENT
+                  value:
+                    error:
+                      code: OVERPAYMENT
+                      message: Contribution amount exceeds remaining amount needed.
+                versionConflict:
+                  summary: VERSION_CONFLICT
+                  value:
+                    error:
+                      code: VERSION_CONFLICT
+                      message: Item was modified. Please refresh and try again.
+                idempotencyConflict:
+                  summary: IDEMPOTENCY_CONFLICT
+                  value:
+                    error:
+                      code: IDEMPOTENCY_CONFLICT
+                      message: A previous request with this requestId had different parameters.
+
+  /uploads/presign:
+    post:
+      tags: [Uploads]
+      summary: Get presigned upload URL
+      description: Admin-only. Get a presigned URL for direct upload to storage.
+      operationId: presignUpload
+      security:
+        - CognitoAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PresignUploadRequest'
+      responses:
+        '200':
+          description: Presigned URL generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresignUploadResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+components:
+  securitySchemes:
+    CognitoAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Cognito JWT token in Authorization header
+
+  schemas:
+    WishlistItemView:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        price:
+          type: number
+          format: double
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+        productUrl:
+          type: string
+          format: uri
+          nullable: true
+        status:
+          type: string
+          enum: [available, partially_funded, funded, archived]
+        totalContributed:
+          type: number
+          format: double
+        isSplitGift:
+          type: boolean
+        category:
+          type: string
+          nullable: true
+        priority:
+          type: string
+          enum: [must_have, nice_to_have, dream]
+        createdAt:
+          type: string
+          format: date-time
+
+    WishlistItem:
+      allOf:
+        - $ref: '#/components/schemas/WishlistItemView'
+        - type: object
+          properties:
+            version:
+              type: integer
+              description: Version for optimistic locking
+
+    ListItemsResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WishlistItemView'
+        nextCursor:
+          type: string
+          description: Pagination token for next page, omitted if no more results
+
+    CreateItemRequest:
+      type: object
+      required:
+        - name
+        - price
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+        price:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        productUrl:
+          type: string
+          format: uri
+          nullable: true
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+        isSplitGift:
+          type: boolean
+          default: false
+        category:
+          type: string
+          nullable: true
+        priority:
+          type: string
+          enum: [must_have, nice_to_have, dream]
+          default: must_have
+
+    UpdateItemRequest:
+      type: object
+      required:
+        - expectedVersion
+      properties:
+        expectedVersion:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+        price:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        productUrl:
+          type: string
+          format: uri
+          nullable: true
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+        isSplitGift:
+          type: boolean
+        category:
+          type: string
+          nullable: true
+        priority:
+          type: string
+          enum: [must_have, nice_to_have, dream]
+
+    ItemResponse:
+      type: object
+      properties:
+        item:
+          $ref: '#/components/schemas/WishlistItem'
+
+    ContributeRequest:
+      type: object
+      required:
+        - itemId
+        - contributorName
+        - amount
+        - requestId
+      properties:
+        itemId:
+          type: string
+        contributorName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        amount:
+          type: number
+          minimum: 1
+          description: Amount in dollars
+        requestId:
+          type: string
+          format: uuid
+          description: UUID v4 for idempotency
+
+    ContributeResponse:
+      type: object
+      properties:
+        contribution:
+          $ref: '#/components/schemas/Contribution'
+        item:
+          $ref: '#/components/schemas/WishlistItemView'
+
+    Contribution:
+      type: object
+      properties:
+        id:
+          type: string
+        itemId:
+          type: string
+        contributorName:
+          type: string
+        amount:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+
+    MetadataFetchRequest:
+      type: object
+      required:
+        - productUrl
+      properties:
+        productUrl:
+          type: string
+          format: uri
+
+    MetadataFetchResponse:
+      type: object
+      properties:
+        metadata:
+          type: object
+          properties:
+            title:
+              type: string
+              nullable: true
+            description:
+              type: string
+              nullable: true
+            imageUrl:
+              type: string
+              format: uri
+              nullable: true
+            siteName:
+              type: string
+              nullable: true
+        warnings:
+          type: array
+          items:
+            type: string
+
+    PresignUploadRequest:
+      type: object
+      required:
+        - fileName
+        - contentType
+        - fileSize
+      properties:
+        fileName:
+          type: string
+        contentType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+        fileSize:
+          type: integer
+          minimum: 1
+          maximum: 5242880
+          description: Max 5MB (5242880 bytes)
+
+    PresignUploadResponse:
+      type: object
+      properties:
+        uploadUrl:
+          type: string
+          format: uri
+        objectKey:
+          type: string
+        publicUrl:
+          type: string
+          format: uri
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              description: Optional additional error details
+
+  responses:
+    ValidationError:
+      description: Request body or parameters failed validation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Invalid request parameters
+              details:
+                field: name
+                reason: must be between 1 and 200 characters
+    Unauthorized:
+      description: Missing or invalid JWT for admin endpoints
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: Missing or invalid authentication token
+    Forbidden:
+      description: Valid JWT but not in admin group
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: FORBIDDEN
+              message: Access denied. Admin privileges required.
+    ItemNotFound:
+      description: Item ID does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: ITEM_NOT_FOUND
+              message: Item not found
