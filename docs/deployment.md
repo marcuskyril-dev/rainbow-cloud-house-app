@@ -155,7 +155,8 @@ npx tsx src/migrations/splitDynamoTables.ts
 Create a `.env` file in the project root for local frontend development:
 
 ```env
-VITE_API_BASE_URL=http://localhost:3001
+VITE_API_BASE_URL_DEV=http://localhost:3001
+VITE_API_BASE_URL_PROD=https://abc123.execute-api.ap-southeast-1.amazonaws.com/prod
 VITE_COGNITO_USER_POOL_ID=ap-southeast-1_XXXXXXXXX
 VITE_COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
 VITE_COGNITO_REGION=ap-southeast-1
@@ -301,7 +302,8 @@ Set these in the Amplify console (App settings → Environment variables):
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `VITE_API_BASE_URL` | API Gateway URL | `https://abc123.execute-api.ap-southeast-1.amazonaws.com/dev` |
+| `VITE_API_BASE_URL_DEV` | API Gateway URL for local/dev hosts | `https://abc123.execute-api.ap-southeast-1.amazonaws.com/dev` |
+| `VITE_API_BASE_URL_PROD` | API Gateway URL for production hosts | `https://abc123.execute-api.ap-southeast-1.amazonaws.com/prod` |
 | `VITE_COGNITO_USER_POOL_ID` | Cognito User Pool ID | `ap-southeast-1_AbCdEfGhI` |
 | `VITE_COGNITO_CLIENT_ID` | Cognito App Client ID | `1a2b3c4d5e6f7g8h9i0j` |
 | `VITE_COGNITO_REGION` | AWS Region | `ap-southeast-1` |

@@ -1,7 +1,43 @@
 import type { ApiError } from "./types";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
+const API_BASE_URL_DEV_RAW =
+  import.meta.env.VITE_API_BASE_URL_DEV ?? undefined;
+const API_BASE_URL_PROD_RAW =
+  import.meta.env.VITE_API_BASE_URL_PROD ?? undefined;
+
+function resolveApiBaseUrl(): string {
+  // This runs in the browser after Vite boots, so we can pick the stage dynamically
+  // using the current host.
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    const isLocal =
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "[::1]" ||
+      host.endsWith(".localhost");
+
+    const base = isLocal ? API_BASE_URL_DEV_RAW : API_BASE_URL_PROD_RAW;
+    if (!base) {
+      throw new Error(
+        `Missing API base URL env var for current host. ` +
+        `Using ${isLocal ? "VITE_API_BASE_URL_DEV" : "VITE_API_BASE_URL_PROD"}.`,
+      );
+    }
+    return base;
+  }
+
+  // This app is expected to run in a browser; without `window`, we can't
+  // reliably decide dev vs prod.
+  throw new Error(
+    "Cannot resolve API base URL outside browser context (missing window).",
+  );
+}
+
+// Avoid double-slashes when the base URL comes from an env var that includes a trailing slash
+// (common in Amplify examples like `.../dev/`).
+const API_BASE_URL_RAW = resolveApiBaseUrl();
+
+const API_BASE_URL = API_BASE_URL_RAW.replace(/\/+$/, "");
 
 export class ApiClientError extends Error {
   status: number;

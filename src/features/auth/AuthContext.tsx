@@ -6,7 +6,12 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { setAuthTokenProvider, setUnauthorizedHandler } from "@/shared/api";
+import {
+  apiClient,
+  ApiClientError,
+  setAuthTokenProvider,
+  setUnauthorizedHandler,
+} from "@/shared/api";
 
 interface AuthUser {
   email: string;
@@ -65,23 +70,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // In production, this calls Cognito via Amplify Auth.
       // For MVP dev, we accept a hardcoded admin credential or delegate to Cognito.
       // This stub simulates the flow structure.
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001"}/auth/login`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error("Invalid credentials");
-      }
-
-      const data = (await response.json()) as {
-        token: string;
-        user: AuthUser;
-      };
+      const data = await apiClient
+        .post<{ token: string; user: AuthUser }>("/auth/login", {
+          email,
+          password,
+        })
+        .catch((err) => {
+          if (err instanceof ApiClientError) {
+            throw new Error("Invalid credentials");
+          }
+          throw err;
+        });
       localStorage.setItem(TOKEN_KEY, data.token);
       localStorage.setItem(USER_KEY, JSON.stringify(data.user));
       setUser(data.user);
