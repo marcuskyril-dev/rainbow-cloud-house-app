@@ -1,5 +1,6 @@
 import * as cdk from "aws-cdk-lib";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as iam from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 
 interface StorageStackProps extends cdk.StackProps {
@@ -14,7 +15,14 @@ export class WishlistStorageStack extends cdk.Stack {
 
     this.imagesBucket = new s3.Bucket(this, "ImagesBucket", {
       bucketName: `wishlist-images-${props.stage}-${this.account}`,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      blockPublicAccess: new s3.BlockPublicAccess({
+        blockPublicAcls: true,
+        ignorePublicAcls: true,
+        // Allow a bucket policy that grants public GET so item images are
+        // accessible directly via the S3 HTTPS URL stored in DynamoDB.
+        blockPublicPolicy: false,
+        restrictPublicBuckets: false,
+      }),
       cors: [
         {
           allowedHeaders: ["*"],
@@ -26,6 +34,15 @@ export class WishlistStorageStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       autoDeleteObjects: false,
     });
+
+    this.imagesBucket.addToResourcePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        principals: [new iam.AnyPrincipal()],
+        actions: ["s3:GetObject"],
+        resources: [`${this.imagesBucket.bucketArn}/items/*`],
+      }),
+    );
 
     new cdk.CfnOutput(this, "ImagesBucketName", {
       value: this.imagesBucket.bucketName,

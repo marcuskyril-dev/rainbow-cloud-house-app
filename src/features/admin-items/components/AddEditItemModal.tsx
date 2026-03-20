@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Modal, Button, Input, Textarea, Select } from "@/shared/ui";
@@ -8,6 +8,7 @@ import {
   type CreateItemFormInput,
 } from "@/shared/lib/validation";
 import { useCreateItem, useUpdateItem } from "@/shared/hooks/useItems";
+import { itemsApi } from "@/shared/api";
 import type { WishlistItemView } from "@/shared/api/types";
 import { ImageDropzone } from "./ImageDropzone";
 
@@ -31,6 +32,7 @@ export function AddEditItemModal({
   const createItem = useCreateItem();
   const updateItem = useUpdateItem();
   const isEditing = !!item;
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const {
     register,
@@ -71,15 +73,58 @@ export function AddEditItemModal({
 
   const handleClose = useCallback(() => {
     reset();
+    setUploadError(null);
     onClose();
   }, [reset, onClose]);
 
+  async function uploadDataUrl(dataUrl: string): Promise<string> {
+    const [header, base64] = dataUrl.split(",");
+    const contentType = header.match(/:(.*?);/)?.[1] as
+      | "image/jpeg"
+      | "image/png"
+      | "image/webp";
+    if (!contentType) throw new Error("Unsupported image type");
+
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: contentType });
+
+    const ext = contentType.split("/")[1];
+    const { uploadUrl, publicUrl } = await itemsApi.presignUpload({
+      fileName: `upload.${ext}`,
+      contentType,
+      fileSize: blob.size,
+    });
+
+    await fetch(uploadUrl, {
+      method: "PUT",
+      body: blob,
+      headers: { "Content-Type": contentType },
+    });
+
+    return publicUrl;
+  }
+
   async function onSubmit(data: CreateItemFormData) {
+    setUploadError(null);
+
+    let imageUrl = data.imageUrl || undefined;
+
+    if (imageUrl?.startsWith("data:")) {
+      try {
+        imageUrl = await uploadDataUrl(imageUrl);
+      } catch {
+        setUploadError("Failed to upload image. Please try again.");
+        return;
+      }
+    }
+
     const payload = {
       ...data,
       price: Math.round(data.price * 100),
       productUrl: data.productUrl || undefined,
-      imageUrl: data.imageUrl || undefined,
+      imageUrl,
       category: data.category || undefined,
     };
 
@@ -164,6 +209,10 @@ export function AddEditItemModal({
           error={errors.description?.message}
           {...register("description")}
         />
+
+        {uploadError && (
+          <p className="text-xs text-red-600">{uploadError}</p>
+        )}
 
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="ghost" onClick={handleClose}>
