@@ -51,7 +51,7 @@ export function ItemCard({
         </div>
 
         {item.description && (
-          <p className="text-sm text-text-secondary line-clamp-2 mb-3 lg:min-h-[80px]">
+          <p className="text-sm text-text-secondary mb-3 lg:min-h-[80px]">
             {item.description}
           </p>
         )}
