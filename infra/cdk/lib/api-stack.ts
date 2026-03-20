@@ -115,6 +115,12 @@ export class WishlistApiStack extends cdk.Stack {
       handler: "dist/handlers/metadataFetch.handler",
     });
 
+    const presignUploadFn = new lambda.Function(this, "PresignUploadFn", {
+      ...fnDefaults,
+      functionName: `wishlist-presignUpload-${props.stage}`,
+      handler: "dist/handlers/presignUpload.handler",
+    });
+
     // --- IAM grants ---
 
     itemsTable.grantReadData(getItemsFn);
@@ -142,6 +148,7 @@ export class WishlistApiStack extends cdk.Stack {
 
     props.imagesBucket.grantReadWrite(createItemFn);
     props.imagesBucket.grantReadWrite(updateItemFn);
+    props.imagesBucket.grantPut(presignUploadFn);
 
     // --- API Gateway ---
 
@@ -267,6 +274,15 @@ export class WishlistApiStack extends cdk.Stack {
     contributeResource.addMethod(
       "POST",
       new apigateway.LambdaIntegration(contributeFn),
+    );
+
+    // POST /uploads/presign (admin - generate S3 presigned PUT URL)
+    const uploadsResource = api.root.addResource("uploads");
+    const presignResource = uploadsResource.addResource("presign");
+    presignResource.addMethod(
+      "POST",
+      new apigateway.LambdaIntegration(presignUploadFn),
+      adminMethodOptions,
     );
 
     // POST /auth/login (public - exchanges email/password for Cognito token)
