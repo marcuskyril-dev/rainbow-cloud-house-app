@@ -1,3 +1,2 @@
-export { OurStoryPage } from "./OurStoryPage";
 export { EventDetailsPage } from "./EventDetailsPage";
-
+export { FaqPage } from "./FaqPage";

@@ -1,6 +1,6 @@
 import { AdminDashboard } from "@/features/admin-items";
 import { AuthProvider, LoginForm, ProtectedRoute } from "@/features/auth";
-import { EventDetailsPage, OurStoryPage } from "@/features/public-pages";
+import { EventDetailsPage, FaqPage } from "@/features/public-pages";
 import { WishlistPage } from "@/features/public-wishlist";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
@@ -21,7 +21,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<WishlistPage />} />
-            <Route path="/our-story" element={<OurStoryPage />} />
+            <Route path="/faq" element={<FaqPage />} />
             <Route path="/event-details" element={<EventDetailsPage />} />
             <Route path="/admin/login" element={<LoginForm />} />
             <Route

@@ -9,7 +9,7 @@ type PublicNavItem = {
 };
 
 const navItems: PublicNavItem[] = [
-  { to: "/our-story", label: "Our Story" },
+  { to: "/faq", label: "FAQ" },
   { to: "/", label: "Wishlist" },
   { to: "/event-details", label: "Event Details" },
 ];
