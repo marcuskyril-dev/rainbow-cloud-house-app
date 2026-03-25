@@ -15,15 +15,15 @@ export const faqAccordionContent: AccordionItem[] = [
   },
   {
     "title": "How do I contribute to a gift?",
-    "content": "Tap \"Contribute\" on any item, enter an amount, and you're done.\n\nYou can contribute anything from $1 up to the remaining amount needed. The progress updates instantly so you can see how close the gift is to being funded."
+    "content": "Tap \"Contribute\" on any item, enter an amount, and you're done.\n\nThe progress updates instantly so you can see how close the gift is to being funded."
   },
   {
     "title": "Can I contribute any amount?",
-    "content": "Yes — you can chip in any amount you like, as long as it's between $1 and the remaining amount needed."
+    "content": "Yes, you can chip in any amount you like, as long as it's between $1 and the remaining amount needed."
   },
   {
     "title": "Can I buy the gift elsewhere?",
-    "content": "Yes! If you'd prefer to buy the item from a different retailer/ online store, just let us know so we can mark it as taken and avoid duplicates."
+    "content": "Yes! If you'd prefer to buy the item from a different store, just let us know so we can mark it as taken and avoid duplicates."
   },
   {
     "title": "Who buys the gift?",
