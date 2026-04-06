@@ -4,7 +4,7 @@ import { statusLabel } from "@/shared/lib/format";
 const statusStyles: Record<ItemStatus, string> = {
   available: "bg-green-100 text-green-800",
   partially_funded: "bg-warm-beige text-olive-dark",
-  funded: "bg-olive/20 text-olive-dark",
+  funded: "bg-olive text-white",
   archived: "bg-gray-100 text-gray-600",
 };
 

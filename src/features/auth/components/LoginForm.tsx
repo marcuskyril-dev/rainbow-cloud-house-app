@@ -27,47 +27,49 @@ export function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-surface-muted">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-sm bg-surface rounded-lg shadow-lg p-6 space-y-4"
-      >
-        <h1 className="text-2xl font-bold font-display text-center">
-          Admin Login
-        </h1>
-
-        {error && (
-          <p className="text-sm text-error bg-red-50 rounded-md px-3 py-2">
-            {error}
-          </p>
-        )}
-
-        <Input
-          label="Email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="admin@example.com"
-          required
-        />
-
-        <Input
-          label="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Enter password"
-          required
-        />
-
-        <Button
-          type="submit"
-          className="w-full"
-          disabled={loading}
+    <div className="px-4 mx-auto max-w-6xl bg-surface-muted">
+      <div className="min-h-screen flex items-center justify-center">
+        <form
+          onSubmit={handleSubmit}
+          className="w-full max-w-sm bg-surface rounded-lg shadow-lg p-6 space-y-4"
         >
-          {loading ? "Signing in..." : "Sign In"}
-        </Button>
-      </form>
+          <h1 className="text-2xl font-bold font-display text-center">
+            Admin Login
+          </h1>
+
+          {error && (
+            <p className="text-sm text-error bg-red-50 rounded-md px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <Input
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="admin@example.com"
+            required
+          />
+
+          <Input
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter password"
+            required
+          />
+
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={loading}
+          >
+            {loading ? "Signing in..." : "Sign In"}
+          </Button>
+        </form>
+      </div>
     </div>
   );
 }
